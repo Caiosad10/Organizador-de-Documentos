@@ -213,6 +213,9 @@ if "user" not in st.session_state:
 if "session" not in st.session_state:
     st.session_state["session"] = None
 
+if "mes_selecionado" not in st.session_state:
+    st.session_state["mes_selecionado"] = None
+
 if "dia_selecionado" not in st.session_state:
     st.session_state["dia_selecionado"] = None
 
@@ -265,78 +268,175 @@ def tela_autenticacao():
     else:
         tela_cadastro()
 
-def dashbord():
-    st.markdown("<h1 class='main-title'>📅 Calendário de Documentos</h1>", unsafe_allow_html=True)
+MESES_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+]
+
+def obter_status_mes(ano: int, mes: int):
+    return {
+        "dias_com_docs": 0,
+        "pendencias": 0,
+        "status": "empty"
+    }
+
+def dashboard_meses():
+    hoje = date.today()
+    ano_atual = hoje.year
+
+    st.markdown("<h1 class='main-title'>Seu ano em documentos</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='subtitle'>Escolha um mês para visualizar e organizar seus comprovantes, notas e documentos.</p>", unsafe_allow_html=True)
+
+    cols = st.columns(4)
+
+    for idx, nome_mes in enumerate(MESES_PT, start=1):
+        col = cols[(idx - 1) % 4]
+        with col:
+            info = obter_status_mes(ano_atual, idx)
+
+            if info["status"] == "ok":
+                status_class = "status-ok"
+                status_text = "Tudo em dia"
+            elif info["status"] == "pending":
+                status_class = "status-pending"
+                status_text = "Pendências abertas"
+            else:
+                status_class = "status-empty"
+                status_text = "Nenhum documento ainda"
+
+            with st.container():
+                st.markdown("<div class='month-card'>", unsafe_allow_html=True)
+
+                st.markdown(
+                    f"""
+                    <div class="month-badge">
+                        <span>📅</span>
+                        <span>{ano_atual}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                st.markdown(
+                    f"<div class='month-name'>{nome_mes}</div>",
+                    unsafe_allow_html=True
+                )
+
+                st.markdown(
+                    f"""
+                    <div class='month-status'>
+                        <span>{info["dias_com_docs"]} dias com documentos</span><br/>
+                        <span>{info["pendencias"]} pendencias</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                st.markdown(
+                    f"""
+                    <div style="margin-top:10px;">
+                        <span class="status-pill {status_class}">{status_text}</span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                # Botão invisível por cima do card (para clique)
+                if st.button(" ", key=f"mes-{idx}", help=nome_mes, use_container_width=True):
+                    st.session_state["mes_selecionado"] = idx
+                    st.session_state["dia_selecionado"] = None
+                    st.rerun()
+
+                st.markdown("</div>", unsafe_allow_html=True)
 
 
 
+def tela_calendario_mes():
+    mes = st.session_state["mes_selecionado"]
     hoje = date.today()
     ano = hoje.year
-    mes = hoje.month
 
     cal = calendar.monthcalendar(ano, mes)
 
-    st.markdown(f"<div class ='month-title'>{calendar.month_name[mes]} {ano}</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"<h1 class='main-title'>📅 {MESES_PT[mes-1]} {ano}</h1>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        "<p class='subtitle'>Selecione um dia para gerenciar os documentos.</p>",
+        unsafe_allow_html=True
+    )
 
-    dias_semana= ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"]
-
+    dias_semana = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]
     cols = st.columns(7)
-
     for i, dia in enumerate(dias_semana):
         cols[i].markdown(
-            f"<div style='text-align:center; color:#94a3b8; font-weight:600'>{dia}</div>", unsafe_allow_html=True
+            f"<div class='weekday-label'>{dia}</div>",
+            unsafe_allow_html=True
         )
-
-    st.write("")
 
     for semana in cal:
         cols = st.columns(7)
-
         for i, dia in enumerate(semana):
             if dia == 0:
-                cols[i].write("")
+                cols[i].write(" ")
             else:
                 with cols[i]:
                     st.markdown("<div class='day-card'>", unsafe_allow_html=True)
-
-                    if st.button(str(dia), key=f'dia-{dia}',use_container_width=True):
-
+                    if st.button(str(dia), key=f"dia-{dia}", use_container_width=True):
                         st.session_state["dia_selecionado"] = dia
                         st.rerun()
-
                     st.markdown("</div>", unsafe_allow_html=True)
+
+    st.write("")
+    with st.container():
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.markdown("<div class='back-btn'>", unsafe_allow_html=True)
+            if st.button("⬅ Voltar aos meses", use_container_width=True):
+                st.session_state["mes_selecionado"] = None
+                st.session_state["dia_selecionado"] = None
+                st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
 def tela_do_dia():
     dia = st.session_state["dia_selecionado"]
-    st.markdown(f"<h1 class='main-title'>📂 Dia {dia}</h1>", unsafe_allow_html=True)
+    mes = st.session_state["mes_selecionado"]
+    hoje = date.today()
+    ano = hoje.year
 
-    st.info("Aqui deve ser feito os uploads dos seus arquivos. Eles ficaram visiveis")
+    st.markdown(
+        f"<h1 class='main-title'>📂 {dia:02d} de {MESES_PT[mes-1]} {ano}</h1>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        "<p class='subtitle'>Aqui você poderá enviar e visualizar os documentos deste dia.</p>",
+        unsafe_allow_html=True
+    )
+
+    st.info("Aqui futuramente entra o upload real, listagem de documentos e status do dia.")
 
     st.write("")
-    st.write("")
-
     col1, col2 = st.columns(2)
-
     with col1:
         st.button("📤 Upload Documento", use_container_width=True)
-
     with col2:
         st.button("📁 Ver Documentos", use_container_width=True)
 
     st.write("")
-    st.write("")
-
-
-    if st.button("⬅ Voltar", use_container_width=True):
+    st.markdown("<div class='back-btn'>", unsafe_allow_html=True)
+    if st.button("⬅ Voltar ao calendário", use_container_width=True):
         st.session_state["dia_selecionado"] = None
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 def main():
     if st.session_state["user"] is None:
         tela_autenticacao()
     else:
-        if st.session_state["dia_selecionado"] is None:
-            dashbord()
+        if st.session_state["mes_selecionado"] is None:
+            dashboard_meses()
+        elif st.session_state["dia_selecionado"] is None:
+            tela_calendario_mes()
         else:
             tela_do_dia()
         
