@@ -113,6 +113,7 @@ st.markdown("""
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    margin-bottom: 22px;
 }
 
 /* Glow suave no hover */
@@ -212,21 +213,21 @@ st.markdown("""
 }
 
 /* Botão de dia */
-.day-card button {
-    width: 100%;
-    height: 60px;
-    border-radius: 18px;
+.stButton > button {
+    background: #1e293b;
     border: 1px solid rgba(148, 163, 184, 0.35);
-    background: rgba(15, 23, 42, 0.9);
-    color: #e5e7eb;
-    font-size: 0.95rem;
-    font-weight: 600;
-    transition: all 0.16s ease-out;
+    color: #e2e8f0;
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
 }
-.day-card button:hover {
-    transform: translateY(-3px);
-    border-color: rgba(59, 130, 246, 0.9);
-    box-shadow: 0 14px 30px rgba(37, 99, 235, 0.45);
+
+.stButton > button:hover {
+    background: #334155;
+    border-color: rgba(96, 165, 250, 0.8);
+    color: #f8fafc;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
 }
 
 /* Cabeçalho dos dias da semana */
@@ -384,52 +385,31 @@ def dashboard_meses():
                 status_class = "status-empty"
                 status_text = "Nenhum documento ainda"
 
-            with st.container():
-                st.markdown("<div class='month-card'>", unsafe_allow_html=True)
-
-                st.markdown(
-                    f"""
+            card_html = f"""
+                <div class="month-card" onclick="window.location.href='?mes={idx}'">
                     <div class="month-badge">
                         <span>📅</span>
                         <span>{ano_atual}</span>
                     </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                st.markdown(
-                    f"<div class='month-name'>{nome_mes}</div>",
-                    unsafe_allow_html=True
-                )
-
-                st.markdown(
-                    f"""
-                    <div class='month-status'>
+                    <div class="month-name">{nome_mes}</div>
+                    <div class="month-status">
                         <span>{info["dias_com_docs"]} dias com documentos</span><br/>
-                        <span>{info["pendencias"]} pendencias</span>
+                        <span>{info["pendencias"]} pendências</span>
                     </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                st.markdown(
-                    f"""
                     <div style="margin-top:10px;">
-                        <span class="status-pill {status_class}">{status_text}</span>
+                        <span class="status-pill {status_class}">
+                        {status_text}
+                        </span>
                     </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                </div>
+                """
 
-                # Botão invisível por cima do card (para clique)
-                if st.button(" ", key=f"mes-{idx}", help=nome_mes, use_container_width=True):
-                    st.session_state["mes_selecionado"] = idx
-                    st.session_state["dia_selecionado"] = None
-                    st.rerun()
+            st.markdown(card_html, unsafe_allow_html=True)
 
-                st.markdown("</div>", unsafe_allow_html=True)
-
-
+    query_params = st.query_params
+    if "mes" in query_params:
+        st.session_state["mes_selecionado"] = int(query_params["mes"])
+        st.rerun()
 
 def tela_calendario_mes():
     mes = st.session_state["mes_selecionado"]
