@@ -115,6 +115,18 @@ st.markdown("""
     overflow: hidden;
     margin-bottom: 22px;
 }
+            
+/* Botão invisível sobre o card */
+.stButton > button {
+    background: transparent;
+    border: none;
+    color: transparent;
+    position: relative;
+    top: -180px; /* ajusta para ficar sobre o card */
+    height: 180px;
+    width: 100%;
+    cursor: pointer;
+}
 
 /* Glow suave no hover */
 .month-card: hover {
@@ -405,11 +417,17 @@ def dashboard_meses():
                 """
 
             st.markdown(card_html, unsafe_allow_html=True)
+            if st.button(" ", key=f"mes-{idx}", help=nome_mes):
+                st.session_state["mes_selecionado"] = idx
+                st.session_state["dia_selecionado"] = None
+                st.rerun()
 
     query_params = st.query_params
     if "mes" in query_params:
         st.session_state["mes_selecionado"] = int(query_params["mes"])
         st.rerun()
+
+    
 
 def tela_calendario_mes():
     mes = st.session_state["mes_selecionado"]
