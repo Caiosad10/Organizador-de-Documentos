@@ -17,6 +17,62 @@ st.set_page_config(
 st.markdown("""
 <style>
 
+/* HEADER PREMIUM ABAIXO DA BARRA DO STREAMLIT */
+.custom-header {
+    max-width: 400px;
+    margin: auto;
+    padding: 28px 26px;
+    background: rgba(15, 23, 42, 0.55);
+    border-radius: 22px;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    backdrop-filter: blur(12px);
+}
+
+/* Conteúdo interno */
+.custom-header-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Ícone minimalista */
+.header-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid #e5e7eb;
+    position: relative;
+}
+
+.header-icon::before,
+.header-icon::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 2px;
+    background: #e5e7eb;
+    border-radius: 2px;
+}
+
+.header-icon::before {
+    top: 6px;
+}
+
+.header-icon::after {
+    top: 12px;
+}
+
+/* Nome do projeto */
+.custom-header-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: 0.5px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+}
+            
 /* Fundo geral */
 .stApp {
     background: radial-gradient(circle at top, #1f2933 0, #020617 45%, #000 100%);
@@ -127,12 +183,19 @@ st.markdown("""
     background: #1d4ed8;
 }
 
-/* Inputs */
+/* Inputs menores */
 .stTextInput input {
-    border-radius: 14px;
-    background-color: #020617;
-    color: white;
-    border: 1px solid #1f2937;
+    height: 36px;
+    font-size: 0.9rem;
+    padding: 6px 10px;
+}
+
+/* Botão de login compacto */
+.stButton > button {
+    height: 38px;
+    font-size: 0.9rem;
+    border-radius: 10px;
+    padding: 0 14px;
 }
 
 /* Radio */
@@ -194,6 +257,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<div class="custom-header">
+    <div class="custom-header-content">
+        <div class="header-icon"></div>
+        <div class="custom-header-title">Organizador de Documentos</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Empurra o conteúdo para baixo (por causa da barra do Streamlit)
+st.write("<br><br>", unsafe_allow_html=True)
+
 
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -220,25 +295,31 @@ if "dia_selecionado" not in st.session_state:
     st.session_state["dia_selecionado"] = None
 
 def tela_login():
-    st.markdown("<h1 class='main-title'>Login</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='subtitle'>Acesse seu painel de documentos organizados.</p>", unsafe_allow_html=True)
-    
 
-    email = st.text_input("Email")
-    senha = st.text_input("Senha", type="password")
+    with st.container():
+        st.markdown("<div class='login-card'>", unsafe_allow_html=True)
 
-    if st.button("Entrar", use_container_width=True) and email and senha:
-        try:
-            res = auth.sign_in_with_password({
-                "email": email,
-                "password": senha
-            })
-            st.session_state["user"] = res.user
-            st.session_state["session"] = res.session
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"Email ou senha incorretos: {e}")
+        st.markdown("<h1 class='main-title' style='text-align:center;'>Login</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='subtitle' style='text-align:center;'>Acesse seu painel de documentos organizados.</p>", unsafe_allow_html=True)
+
+        email = st.text_input("Email", key="login_email")
+        senha = st.text_input("Senha", type="password", key="login_senha")
+
+        st.write("")
+        if st.button("Entrar", use_container_width=True, key="login_btn") and email and senha:
+            try:
+                res = auth.sign_in_with_password({
+                    "email": email,
+                    "password": senha
+                })
+                st.session_state["user"] = res.user
+                st.session_state["session"] = res.session
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Email ou senha incorretos: {e}")
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 def tela_cadastro():
     st.markdown("<h1 class='main-title'>Cadastro</h1>", unsafe_allow_html=True)
