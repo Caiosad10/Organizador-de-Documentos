@@ -750,6 +750,8 @@ def tela_do_dia():
 
     st.markdown("**Documentos do dia**")
     docs = listar_documentos_do_dia(data_str)
+    comprovantes = []
+    vinculados = []
 
     if not docs:
         st.markdown(
