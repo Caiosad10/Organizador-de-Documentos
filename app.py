@@ -5,6 +5,7 @@ from gotrue import SyncGoTrueClient
 from postgrest import SyncPostgrestClient
 from storage3 import SyncStorageClient
 from datetime import date
+from urllib.parse import urlencode
 import uuid
 
 #Confifuração da pagina
@@ -136,6 +137,24 @@ header[data-testid="stHeader"] {
 }
 
 /* Cards de Mes */
+.month-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.month-link {
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-decoration: none;
+}
+
+.month-link:hover {
+    text-decoration: none;
+}
+
 .month-card {
     background: linear-gradient(145deg, #0f1f3d, #060f1e);
     border-radius: 20px;
@@ -143,7 +162,32 @@ header[data-testid="stHeader"] {
     border: 1px solid rgba(59, 130, 246, 0.12);
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
     min-height: 130px;
-    margin-bottom: 16px;
+}
+
+.month-link:hover .month-card {
+    border-color: rgba(96, 165, 250, 0.45);
+}
+
+.month-open {
+    align-items: center;
+    background: #1e293b;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 12px;
+    color: #e2e8f0;
+    display: flex;
+    font-size: 0.9rem;
+    font-weight: 600;
+    justify-content: center;
+    min-height: 42px;
+    padding: 8px 14px;
+    transition: all 0.2s ease;
+}
+
+.month-link:hover .month-open {
+    background: #334155;
+    border-color: rgba(96, 165, 250, 0.8);
+    color: #f8fafc;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
 }
 
 /* Nome do mes */
@@ -282,6 +326,12 @@ hr {
 }
 
 /* ── CALENDÁRIO ── */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 20px;
+}
+
 .weekday-label {
     text-align: center;
     color: #475569;
@@ -291,21 +341,68 @@ hr {
     padding: 6px 0;
 }
  
-.day-empty {
-    height: 44px;
+.calendar-day,
+.calendar-empty {
+    min-height: 54px;
 }
 
-/* Botão de voltar */
-.btn-back > button {
-    background: transparent;
-    border: 1px solid rgba(100, 116, 139, 0.3);
-    color: #64748b;
-    font-size: 0.8rem;
+.calendar-day {
+    align-items: center;
+    background: #1e293b;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 12px;
+    color: #e2e8f0;
+    display: flex;
+    font-size: 0.9rem;
+    font-weight: 600;
+    justify-content: center;
+    position: relative;
+    text-decoration: none;
+    transition: all 0.2s ease;
 }
-            
-.btn-back > button:hover {
-    border-color: rgba(100, 116, 139, 0.6);
-    color: #94a3b8;
+
+.calendar-day:hover {
+    background: #334155;
+    border-color: rgba(96, 165, 250, 0.8);
+    color: #f8fafc;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    text-decoration: none;
+}
+
+.calendar-day.has-doc::after {
+    background: #60a5fa;
+    border-radius: 999px;
+    content: "";
+    height: 6px;
+    position: absolute;
+    right: 14px;
+    top: 12px;
+    width: 6px;
+}
+
+.back-link {
+    align-items: center;
+    background: #1e293b;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 12px;
+    color: #e2e8f0;
+    display: flex;
+    font-size: 0.9rem;
+    font-weight: 600;
+    justify-content: center;
+    min-height: 42px;
+    padding: 8px 14px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.back-link:hover {
+    background: #334155;
+    border-color: rgba(96, 165, 250, 0.8);
+    color: #f8fafc;
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    text-decoration: none;
 }
 
 /* ── ALERTAS ── */
@@ -333,6 +430,49 @@ hr {
 .doc-card-meta {
     font-size: 0.75rem;
     color: #475569;
+}
+
+@media (max-width: 640px) {
+    .block-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .main-title {
+        font-size: 2.4rem;
+        line-height: 1.1;
+    }
+
+    .month-grid {
+        grid-template-columns: 1fr;
+        gap: 22px;
+    }
+
+    .month-card {
+        min-height: 148px;
+        padding: 22px;
+    }
+
+    .calendar-grid {
+        gap: 8px;
+    }
+
+    .weekday-label {
+        font-size: 0.66rem;
+        letter-spacing: 0.04em;
+        padding: 4px 0;
+    }
+
+    .calendar-day,
+    .calendar-empty {
+        border-radius: 10px;
+        min-height: 42px;
+    }
+
+    .calendar-day.has-doc::after {
+        right: 8px;
+        top: 8px;
+    }
 }
 
 </style>
@@ -388,6 +528,61 @@ for key, value in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = value
 
+def obter_parametro_url(nome: str) -> str | None:
+    try:
+        valor = st.query_params.get(nome)
+    except AttributeError:
+        valor = st.experimental_get_query_params().get(nome)
+
+    if isinstance(valor, list):
+        return valor[0] if valor else None
+    return valor
+
+def limpar_parametros_navegacao():
+    try:
+        st.query_params.clear()
+    except AttributeError:
+        st.experimental_set_query_params()
+
+def sincronizar_navegacao_url():
+    mes_param = obter_parametro_url("mes")
+    dia_param = obter_parametro_url("dia")
+
+    if mes_param is None:
+        st.session_state["mes_selecionado"] = None
+        st.session_state["dia_selecionado"] = None
+        return
+
+    try:
+        mes = int(mes_param)
+    except (TypeError, ValueError):
+        limpar_parametros_navegacao()
+        st.session_state["mes_selecionado"] = None
+        st.session_state["dia_selecionado"] = None
+        return
+
+    if mes < 1 or mes > 12:
+        limpar_parametros_navegacao()
+        st.session_state["mes_selecionado"] = None
+        st.session_state["dia_selecionado"] = None
+        return
+
+    st.session_state["mes_selecionado"] = mes
+    st.session_state["dia_selecionado"] = None
+
+    if dia_param is None:
+        return
+
+    try:
+        dia = int(dia_param)
+    except (TypeError, ValueError):
+        return
+
+    ano = date.today().year
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    if 1 <= dia <= ultimo_dia:
+        st.session_state["dia_selecionado"] = dia
+
 # CONSTANTES
 
 MESES_PT = [
@@ -418,6 +613,7 @@ def render_header():
             st.markdown(f"<span style='font-size:0.8rem; color:#64748b;'>{email}</span>", unsafe_allow_html=True)
             st.write("")
             if st.button("Sair", use_container_width=True):
+                limpar_parametros_navegacao()
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
                 st.rerun()
@@ -566,39 +762,36 @@ def dashboard_meses():
     elif hoje.day >= 25:
         st.warning(f"📋 Faltam poucos dias para o fechamento de {MESES_PT[hoje.month - 1]}. Confira os documentos pendentes.")
 
-    cols = st.columns(4)
-
+    cards_html = ['<div class="month-grid">']
     for idx, nome_mes in enumerate(MESES_PT, start=1):
-        col = cols[(idx - 1) % 4]
-        with col:
-            info = obter_status_mes(ano_atual, idx)
+        info = obter_status_mes(ano_atual, idx)
+        status_map = {
+            "ok":      ("status-ok",      "&check; Tudo em dia"),
+            "pending": ("status-pending", "Pend&ecirc;ncias"),
+            "urgent":  ("status-urgent",  "Urgente"),
+            "empty":   ("status-empty",   "&mdash; Sem documentos"),
+        }
+        status_class, status_text = status_map[info["status"]]
+        href = f"?{urlencode({'mes': idx})}"
 
-            status_map = {
-                "ok":      ("status-ok",      "✓ Tudo em dia"),
-                "pending": ("status-pending", "⚠ Pendências"),
-                "urgent":  ("status-urgent",  "🔴 Urgente"),
-                "empty":   ("status-empty",   "— Sem documentos"),
-            }
-            status_class, status_text = status_map[info["status"]]
-                
-
-            st.markdown(f"""
+        cards_html.append(f"""
+            <a class="month-link" href="{href}">
                 <div class="month-card">
                     <div class="month-year">{ano_atual}</div>
                     <div class="month-name">{nome_mes}</div>
                     <div class="month-stats">
                         {info["dias_com_docs"]} dias com documentos<br/>
-                        {info["pendencias"]} pendência(s)
+                        {info["pendencias"]} pend&ecirc;ncia(s)
                     </div>
                     <span class="status-pill {status_class}">{status_text}</span>
                 </div>
-            """, unsafe_allow_html=True)
- 
-            if st.button("Abrir", key=f"mes-{idx}", use_container_width=True):
-                st.session_state["mes_selecionado"] = idx
-                st.session_state["dia_selecionado"] = None
-                st.rerun()
+                <span class="month-open">Abrir</span>
+            </a>
+        """)
 
+    cards_html.append("</div>")
+    st.markdown("\n".join(cards_html), unsafe_allow_html=True)
+    return
 
 def tela_calendario_mes():
     render_header()
@@ -618,14 +811,6 @@ def tela_calendario_mes():
         unsafe_allow_html=True
     )
 
-    dias_semana = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]
-    cols = st.columns(7)
-    for i, dia in enumerate(dias_semana):
-        cols[i].markdown(
-            f"<div class='weekday-label'>{dia}</div>",
-            unsafe_allow_html=True
-        )
-
     try:
         db = get_db()
         inicio = f"{ano}-{mes:02d}-01"
@@ -638,27 +823,29 @@ def tela_calendario_mes():
     except Exception:
         dias_com_doc = set()
 
+    dias_semana_grid = ["SEG", "TER", "QUA", "QUI", "SEX", "S&Aacute;B", "DOM"]
+    calendario_html = ['<div class="calendar-grid">']
+
+    for dia_semana in dias_semana_grid:
+        calendario_html.append(f"<div class='weekday-label'>{dia_semana}</div>")
+
     for semana in cal:
-        cols = st.columns(7)
-        for i, dia in enumerate(semana):
-            with cols[i]:
-                if dia == 0:
-                    st.markdown("<div class='day-empty'></div>", unsafe_allow_html=True)
-                else:
-                    # Indicador visual se o dia já tem documentos
-                    indicador = " 🔵" if dia in dias_com_doc else ""
-                    label = f"{dia}{indicador}"
-                    if st.button(label, key=f"dia-{dia}", use_container_width=True):
-                        st.session_state["dia_selecionado"] = dia
-                        st.rerun()
+        for dia in semana:
+            if dia == 0:
+                calendario_html.append("<div class='calendar-empty'></div>")
+            else:
+                classe_doc = " has-doc" if dia in dias_com_doc else ""
+                href = f"?{urlencode({'mes': mes, 'dia': dia})}"
+                calendario_html.append(
+                    f'<a class="calendar-day{classe_doc}" href="{href}" aria-label="Abrir dia {dia}">{dia}</a>'
+                )
+
+    calendario_html.append("</div>")
+    st.markdown("\n".join(calendario_html), unsafe_allow_html=True)
 
     st.write("")
-    st.markdown("<div class='btn-back'>", unsafe_allow_html=True)
-    if st.button("← Voltar aos meses", use_container_width=True):
-        st.session_state["mes_selecionado"] = None
-        st.session_state["dia_selecionado"] = None
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<a class="back-link" href="?">&larr; Voltar aos meses</a>', unsafe_allow_html=True)
+    return
 
 # Tela do dia
 
@@ -793,11 +980,9 @@ def tela_do_dia():
                 """, unsafe_allow_html=True)
 
     st.write("")
-    st.markdown("<div class='btn-back'>", unsafe_allow_html=True)
-    if st.button("← Voltar ao calendário", use_container_width=True):
-        st.session_state["dia_selecionado"] = None
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    href_calendario = f"?{urlencode({'mes': mes})}"
+    st.markdown(f'<a class="back-link" href="{href_calendario}">&larr; Voltar ao calend&aacute;rio</a>', unsafe_allow_html=True)
+    return
 
 # MAIN
 
@@ -805,6 +990,7 @@ def main():
     if st.session_state["user"] is None:
         tela_autenticacao()
     else:
+        sincronizar_navegacao_url()
         if st.session_state["mes_selecionado"] is None:
             dashboard_meses()
         elif st.session_state["dia_selecionado"] is None:
