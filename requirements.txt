@@ -1,0 +1,4 @@
+gotrue
+postgrest
+storage3
+supabase
