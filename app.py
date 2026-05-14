@@ -116,16 +116,23 @@ st.markdown("""
     margin-bottom: 22px;
 }
             
-/* Botão invisível sobre o card */
-.stButton > button {
-    background: transparent;
-    border: none;
-    color: transparent;
-    position: relative;
-    top: -180px; /* ajusta para ficar sobre o card */
-    height: 180px;
+/* Botão Selecionar integrado ao card */
+.month-select-btn > button {
     width: 100%;
-    cursor: pointer;
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #e5e7eb;
+    border-radius: 14px;
+    padding: 6px 0;
+    font-size: 0.85rem;
+    margin-top: 6px;
+    transition: all 0.18s ease-out;
+}
+
+.month-select-btn > button:hover {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(59, 130, 246, 0.8);
+    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.25);
 }
 
 /* Glow suave no hover */
@@ -319,7 +326,7 @@ def tela_login():
         senha = st.text_input("Senha", type="password", key="login_senha")
 
         st.write("")
-        if st.button("Entrar", use_container_width=True, key="login_btn") and email and senha:
+        if st.button("Entrar", use_container_width=True) and email and senha:
             try:
                 res = auth.sign_in_with_password({
                     "email": email,
@@ -396,6 +403,7 @@ def dashboard_meses():
             else:
                 status_class = "status-empty"
                 status_text = "Nenhum documento ainda"
+                
 
             card_html = f"""
                 <div class="month-card" onclick="window.location.href='?mes={idx}'">
@@ -417,7 +425,8 @@ def dashboard_meses():
                 """
 
             st.markdown(card_html, unsafe_allow_html=True)
-            if st.button(" ", key=f"mes-{idx}", help=nome_mes):
+            
+            if st.button("Selecionar", key=f"mes-{idx}", help=nome_mes, type="secondary"):
                 st.session_state["mes_selecionado"] = idx
                 st.session_state["dia_selecionado"] = None
                 st.rerun()
