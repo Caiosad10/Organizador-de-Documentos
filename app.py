@@ -5,6 +5,7 @@ from gotrue import SyncGoTrueClient
 from postgrest import SyncPostgrestClient
 from storage3 import SyncStorageClient
 from datetime import date
+import re
 import uuid
 
 #Confifuração da pagina
@@ -398,6 +399,18 @@ TIPOS_DOCUMENTO = ["comprovante", "boleto", "nota_fiscal", "PC", "recibo", "outr
 
 BUCKET = "documents"
 
+def limpar_nome_arquivo(nome: str) -> str:
+    nome = nome.replace("\\", "/").split("/")[-1].strip()
+    nome = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", nome)
+    nome = re.sub(r"\s+", " ", nome)
+    return nome or f"{uuid.uuid4()}.pdf"
+
+def nome_documento(doc: dict) -> str:
+    return doc["file_path"].split("/")[-1]
+
+def tipo_documento_label(tipo: str) -> str:
+    return tipo.replace("_", " ").upper()
+
 # Header com Perfil
 
 def render_header():
@@ -665,9 +678,9 @@ def fazer_upload(arquivo, user_id: str, data: str, tipo: str) -> str | None:
     
     try:
         storage = get_storage()
-        extensao = arquivo.name.split(".")[-1]
-        nome_arquivo = f"{uuid.uuid4()}.{extensao}"
-        caminho = f"{user_id}/{data}/{nome_arquivo}"
+        nome_arquivo = limpar_nome_arquivo(arquivo.name)
+        pasta_unica = str(uuid.uuid4())
+        caminho = f"{user_id}/{data}/{pasta_unica}/{nome_arquivo}"
  
         storage.from_(BUCKET).upload(
             path=caminho,
@@ -703,6 +716,176 @@ def listar_documentos_do_dia(data: str) -> list:
         return res.data or []
     except Exception:
         return []
+
+def listar_links_documentos(docs: list) -> list:
+    if not docs:
+        return []
+
+    ids = [d["id"] for d in docs]
+    links = {}
+
+    try:
+        db = get_db()
+        por_comprovante = (
+            db.table("links")
+            .select("*")
+            .in_("comprovante_id", ids)
+            .execute()
+        )
+        por_documento = (
+            db.table("links")
+            .select("*")
+            .in_("documento_id", ids)
+            .execute()
+        )
+
+        for item in (por_comprovante.data or []) + (por_documento.data or []):
+            links[item["id"]] = item
+
+    except Exception as e:
+        st.warning(f"Não foi possível carregar os vínculos: {e}")
+
+    return list(links.values())
+
+def salvar_vinculo(comprovante_id: str, documento_id: str) -> bool:
+    if comprovante_id == documento_id:
+        st.warning("Selecione documentos diferentes para criar o vínculo.")
+        return False
+
+    try:
+        db = get_db()
+        existente = (
+            db.table("links")
+            .select("id")
+            .eq("comprovante_id", comprovante_id)
+            .eq("documento_id", documento_id)
+            .execute()
+        )
+        if existente.data:
+            st.info("Esse vínculo já existe.")
+            return False
+
+        db.table("links").insert({
+            "comprovante_id": comprovante_id,
+            "documento_id": documento_id,
+        }).execute()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao vincular documento: {e}")
+        return False
+
+def excluir_documento(doc: dict) -> bool:
+    try:
+        db = get_db()
+        doc_id = doc["id"]
+
+        db.table("links").delete().eq("comprovante_id", doc_id).execute()
+        db.table("links").delete().eq("documento_id", doc_id).execute()
+        db.table("documents").delete().eq("id", doc_id).execute()
+
+        try:
+            get_storage().from_(BUCKET).remove([doc["file_path"]])
+        except Exception as e:
+            st.warning(f"Registro excluído, mas não consegui remover o arquivo do Storage: {e}")
+
+        return True
+    except Exception as e:
+        st.error(f"Erro ao excluir documento: {e}")
+        return False
+
+def montar_vinculo_ids(doc_origem: dict, doc_destino: dict) -> tuple[str, str]:
+    if doc_origem["type"] == "comprovante":
+        return doc_origem["id"], doc_destino["id"]
+    if doc_destino["type"] == "comprovante":
+        return doc_destino["id"], doc_origem["id"]
+
+    ids = sorted([doc_origem["id"], doc_destino["id"]])
+    return ids[0], ids[1]
+
+def ids_vinculados(doc_id: str, links: list) -> set:
+    vinculados = set()
+    for link in links:
+        if link["comprovante_id"] == doc_id:
+            vinculados.add(link["documento_id"])
+        if link["documento_id"] == doc_id:
+            vinculados.add(link["comprovante_id"])
+    return vinculados
+
+def render_documento_card(doc: dict, docs: list, links: list):
+    doc_id = doc["id"]
+    docs_por_id = {d["id"]: d for d in docs}
+    vinculados_ids = ids_vinculados(doc_id, links)
+    vinculados = [docs_por_id[i] for i in vinculados_ids if i in docs_por_id]
+    nome = nome_documento(doc)
+    tipo_label = tipo_documento_label(doc["type"])
+
+    if vinculados:
+        nomes_vinculados = ", ".join(nome_documento(d) for d in vinculados)
+        vinculo_texto = f"Vinculado a: {nomes_vinculados}"
+    else:
+        vinculo_texto = "Sem vínculo"
+
+    st.markdown(f"""
+        <div class="doc-card">
+            <div class="doc-card-title">📄 {nome}</div>
+            <div class="doc-card-meta">{tipo_label} · {doc["created_at"][:10]} · {vinculo_texto}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col_vincular, col_excluir = st.columns(2)
+    abrir_key = f"link-open-{doc_id}"
+    excluir_key = f"delete-open-{doc_id}"
+
+    with col_vincular:
+        if st.button("Vincular documento", key=f"btn-link-{doc_id}", use_container_width=True):
+            st.session_state[abrir_key] = not st.session_state.get(abrir_key, False)
+            st.session_state[excluir_key] = False
+
+    with col_excluir:
+        if st.button("Excluir documento", key=f"btn-delete-{doc_id}", use_container_width=True):
+            st.session_state[excluir_key] = True
+            st.session_state[abrir_key] = False
+
+    if st.session_state.get(abrir_key, False):
+        candidatos = [
+            d for d in docs
+            if d["id"] != doc_id and d["id"] not in vinculados_ids
+        ]
+
+        if not candidatos:
+            st.info("Não há documentos disponíveis para vincular neste dia.")
+        else:
+            opcoes = [d["id"] for d in candidatos]
+            labels = {
+                d["id"]: f"{tipo_documento_label(d['type'])} · {nome_documento(d)}"
+                for d in candidatos
+            }
+            destino_id = st.selectbox(
+                "Escolha o documento para vincular",
+                options=opcoes,
+                format_func=lambda item: labels[item],
+                key=f"select-link-{doc_id}"
+            )
+            destino = docs_por_id[destino_id]
+            comprovante_id, documento_id = montar_vinculo_ids(doc, destino)
+
+            if st.button("Confirmar vínculo", key=f"confirm-link-{doc_id}", use_container_width=True):
+                if salvar_vinculo(comprovante_id, documento_id):
+                    st.success("Documento vinculado com sucesso!")
+                    st.rerun()
+
+    if st.session_state.get(excluir_key, False):
+        st.warning(f"Confirmar exclusão de {nome}? Esta ação remove o registro e seus vínculos.")
+        col_confirmar, col_cancelar = st.columns(2)
+        with col_confirmar:
+            if st.button("Confirmar exclusão", key=f"confirm-delete-{doc_id}", use_container_width=True):
+                if excluir_documento(doc):
+                    st.success("Documento excluído com sucesso!")
+                    st.rerun()
+        with col_cancelar:
+            if st.button("Cancelar", key=f"cancel-delete-{doc_id}", use_container_width=True):
+                st.session_state[excluir_key] = False
+                st.rerun()
 
 def tela_do_dia():
     render_header()
@@ -749,6 +932,7 @@ def tela_do_dia():
 
     st.markdown("**Documentos do dia**")
     docs = listar_documentos_do_dia(data_str)
+    links = listar_links_documentos(docs)
     comprovantes = []
     vinculados = []
 
@@ -768,28 +952,15 @@ def tela_do_dia():
                 unsafe_allow_html=True
             )
             for doc in comprovantes:
-                nome = doc["file_path"].split("/")[-1]
-                st.markdown(f"""
-                    <div class="doc-card">
-                        <div class="doc-card-title">🧾 {nome}</div>
-                        <div class="doc-card-meta">Adicionado em {doc["created_at"][:10]}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_documento_card(doc, docs, links)
 
     if vinculados:
             st.markdown(
-                "<p style='font-size:0.8rem; color:#64748b; margin-bottom:6px; margin-top:14px;'>DOCUMENTOS VINCULADOS</p>",
+                "<p style='font-size:0.8rem; color:#64748b; margin-bottom:6px; margin-top:14px;'>DEMAIS DOCUMENTOS</p>",
                 unsafe_allow_html=True
             )
             for doc in vinculados:
-                nome = doc["file_path"].split("/")[-1]
-                tipo_label = doc["type"].replace("_", " ").upper()
-                st.markdown(f"""
-                    <div class="doc-card">
-                        <div class="doc-card-title">📄 {nome}</div>
-                        <div class="doc-card-meta">{tipo_label} · {doc["created_at"][:10]}</div>
-                    </div>
-                """, unsafe_allow_html=True)
+                render_documento_card(doc, docs, links)
 
     st.write("")
     st.markdown("<div class='btn-back'>", unsafe_allow_html=True)
